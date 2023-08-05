@@ -1,0 +1,178 @@
+---
+title: "MANOVA TEST ANALYSIS"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Cleaning
+```{r}
+# loading student performance data
+performance <- read.csv(file = 'Assignment_1.csv', 
+                        col.names = c('Id', 'ses', 'engach', 'mathsach'))
+```
+
+```{r}
+head(performance)
+```
+
+```{r}
+str(performance)
+```
+
+## Step 1: Check for MANOVA Assumptions 
+
+__Assumptions of MANOVA__
+
+- There must be linearity between pairs of dependent or response variables
+```{r message=FALSE, warning=FALSE}
+require(GGally)
+
+# checking for Linearity
+
+# pairs plot
+ggpairs(performance[,c("engach", "mathsach")],) + 
+  ggtitle('Checking for Linearity Assumption')
+
+# correlation coefficients
+corr <- cor.test(performance$engach, performance$mathsach)
+corr$p.value # pvalue
+corr$estimate # correlation coefficient
+```
+
+- Normality of multivariate variables and groups
+```{r}
+# checking for normality
+library(MVN)
+library(mvnormtest)
+library(nortest)
+
+
+# Checking for multivariate normality
+mvnormtest::mshapiro.test(t(performance[,3:4]))
+
+
+res <- mvn(performance[,3:4], mvnTest = 'mardia')
+res
+```
+
+Both dependent variables are not normally distributed, with pvalue (0.003892) < 0.05. Therefore, we reject the null that the multivariate samples are normally distributed.
+
+
+Next we will check the univariate normality of the two dependent variables. We will use the shapiro test, Anderson-Darling, and Lillie tests to do that.
+```{r}
+# checking for univariate normality
+
+# Shapiro Test
+shapiro.test(performance$engach)
+shapiro.test(performance$mathsach)
+```
+
+```{r}
+# Anderson-Darling Test
+ad.test(performance$engach)
+ad.test(performance$mathsach)
+```
+
+```{r}
+# Kolmogorov-Smirnov test
+lillie.test(performance$engach)
+lillie.test(performance$mathsach)
+```
+
+From the three normality tests applied to test the normality of engach and mathsach, only engach is normally distributed while mathsach is not. From all the tests, the pvalues for engach was greater than the 0.05, hence we will fail to reject the null hypothesis and conclude that the distribution is normal. On the other hand, mathsach has pvalues less than 0.05, as a result, we reject the null hypothesis and conclude that the mathsach distribution is not normal in nature.
+
+
+- Testing normality of univariates across outcomes using the Shapiro-Wilk test
+```{r}
+# univariate normality across outcomes
+
+# engach
+tapply(performance$engach, performance$ses, shapiro.test)
+```
+From the shapiro-Wilk test, engach variable is normally distributed across outcomes, with pvalues > 0.05.
+
+```{r}
+# mathsach
+tapply(performance$mathsach, performance$ses, shapiro.test)
+```
+
+For mathsach, only the second class (2) is not normally distributed, with the mathsach distribution across other classes normally distributed.
+
+
+- Checking for adequate sample size
+```{r}
+# checking for adequate sample size
+table(performance$ses)
+```
+Both classes have similar number of samples
+
+
+- Assumption of homogeneity of covariances
+```{r}
+library(biotools)
+# Checking for Homogeneity of covariance using a boxM test
+boxM(data = performance[,3:4], grouping = performance$ses)
+
+```
+
+
+## Step 2: MANOVA test
+
+```{r}
+# MANOVA test
+manova_model <- manova(cbind(engach, mathsach) ~ ses, data=performance)
+```
+
+
+- MANOVA model using various tests: Pillai, Wilk, Hotelling-Lawley and Roy variants.
+```{r}
+# Pillai Test
+summary(manova_model, test = 'Pillai')
+
+# Wilk Test
+summary(manova_model, test = 'Wilk')
+
+# Hotelling-Lawley Test
+summary(manova_model, test = 'Hotelling-Lawley')
+
+# Roy Test
+summary(manova_model, test = 'Roy')
+```
+
+## Step 3: Univariate ANOVA for each dependent variable
+
+```{r}
+# univariate ANOVA of Dependent variables
+summary.aov(manova_model)
+```
+There's no significant difference in the mean engach value for all outcomes. The pvalue (0.1386) is greater than the level of significance (5%), therefore, we will fail to reject the null hypothesis.
+
+On the other hand for mathsach, there's a significant difference in the mean mathsach value for all outcome categories. This is significant at 5% significance level. As a result, we will reject the null hypothesis of no difference in means.
+
+
+## Step 4: Pairwise Test: Post Hoc Tests
+```{r}
+# pairwise test using the Bonferroni Adjustments
+
+# for engach
+pairwise.t.test(performance$engach, performance$ses, 
+                p.adjust.method = 'bonferroni')
+
+# for mathsach
+pairwise.t.test(performance$mathsach, performance$ses, 
+                p.adjust.method = 'bonferroni')
+```
+
+From the post-hoc test result for engfach, there's no significant difference in engach scores by either of the outcome groups. All groups have pvalues greater than  0.05.
+ 
+For mathsach, there's a statistical difference in the mathsach score gotten by people in group 1 and 3. For the other groups, 2 and 3, there is none.
+
+
+
+
+
+
